@@ -22,6 +22,13 @@ const adminRoutes = require("./src/routes/admin");
 
 const app = express();
 
+// A Vercel roda o app atrás de um proxy reverso, que adiciona o cabeçalho
+// X-Forwarded-For com o IP real de quem acessou. Sem isso, o Express não
+// confia nesse cabeçalho e o express-rate-limit (usado no login/cadastro)
+// trava com um erro de validação, derrubando a rota com "Erro interno no
+// servidor". "1" = confia em 1 proxy à frente (o da própria Vercel).
+app.set("trust proxy", 1);
+
 app.disable("x-powered-by");
 app.use(express.json());
 app.use(cookieParser());
