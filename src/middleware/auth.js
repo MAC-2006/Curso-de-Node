@@ -1,5 +1,5 @@
-// src/middleware/auth.js
 const jwt = require("jsonwebtoken");
+const db = require("../db");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const COOKIE_NAME = "curso_token";
@@ -19,10 +19,10 @@ function assinarToken(usuario) {
 
 function definirCookie(res, token) {
   res.cookie(COOKIE_NAME, token, {
-    httpOnly: true, // JavaScript do navegador não consegue ler esse cookie (protege contra XSS)
-    sameSite: "lax", // proteção básica contra CSRF
-    secure: process.env.NODE_ENV === "production", // exige HTTPS em produção
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/",
   });
 }
@@ -31,29 +31,47 @@ function limparCookie(res) {
   res.clearCookie(COOKIE_NAME, { path: "/" });
 }
 
-// Middleware: exige que o usuário esteja logado
-function exigirAutenticacao(req, res, next) {
+// Exige login e confirma que a conta ainda existe no banco.
+async function exigirAutenticacao(req, res, next) {
   const token = req.cookies?.[COOKIE_NAME];
   if (!token) {
     return res.status(401).json({ erro: "Você precisa estar logado." });
   }
+
+  let payload;
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.usuario = {
-      id: payload.sub,
-      name: payload.name,
-      email: payload.email,
-      isAdmin: !!payload.isAdmin,
-    };
-    next();
+    payload = jwt.verify(token, JWT_SECRET);
   } catch (err) {
     limparCookie(res);
     return res.status(401).json({ erro: "Sessão inválida ou expirada. Faça login novamente." });
   }
+
+  try {
+    await db.init();
+    const { rows } = await db.query(
+      "SELECT id, name, email, is_admin FROM users WHERE id = $1",
+      [payload.sub]
+    );
+    const registro = rows[0];
+
+    // Invalida automaticamente tokens de contas removidas.
+    if (!registro) {
+      limparCookie(res);
+      return res.status(401).json({ erro: "Sua conta não está mais disponível. Faça login novamente." });
+    }
+
+    req.usuario = {
+      id: registro.id,
+      name: registro.name,
+      email: registro.email,
+      isAdmin: !!registro.is_admin,
+    };
+    next();
+  } catch (err) {
+    next(err);
+  }
 }
 
-// Middleware: exige que o usuário esteja logado E seja administrador.
-// Deve ser usado sempre depois de exigirAutenticacao.
 function exigirAdmin(req, res, next) {
   if (!req.usuario || !req.usuario.isAdmin) {
     return res.status(403).json({ erro: "Acesso restrito à administração." });
@@ -61,7 +79,6 @@ function exigirAdmin(req, res, next) {
   next();
 }
 
-// Middleware: se houver token válido, anexa o usuário, mas não bloqueia
 function autenticacaoOpcional(req, res, next) {
   const token = req.cookies?.[COOKIE_NAME];
   if (token) {
@@ -74,7 +91,7 @@ function autenticacaoOpcional(req, res, next) {
         isAdmin: !!payload.isAdmin,
       };
     } catch (err) {
-      // token inválido: segue sem usuário autenticado
+      // Token inválido: segue sem usuário autenticado.
     }
   }
   next();

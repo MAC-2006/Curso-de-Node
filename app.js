@@ -19,6 +19,7 @@ const authRoutes = require("./src/routes/auth");
 const cursoRoutes = require("./src/routes/curso");
 const progressoRoutes = require("./src/routes/progresso");
 const adminRoutes = require("./src/routes/admin");
+const desafiosRoutes = require("./src/routes/desafios");
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/curriculo", cursoRoutes);
 app.use("/api/progresso", progressoRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/desafios", desafiosRoutes);
 
 // Front-end estático (usado apenas no modo local; na Vercel os arquivos de
 // public/ são servidos diretamente pela CDN estática, veja vercel.json)

@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS quiz_results (
   id         SERIAL PRIMARY KEY,
   user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   lesson_id  TEXT NOT NULL,
+  option_index INTEGER,
   correct    INTEGER NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -37,6 +38,41 @@ CREATE TABLE IF NOT EXISTS video_overrides (
   video_url  TEXT NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Desafios práticos (simulador de Node-RED em modo prova)
+CREATE TABLE IF NOT EXISTS challenge_attempts (
+  id            SERIAL PRIMARY KEY,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  challenge_id  TEXT NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'em_andamento',
+  started_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  deadline_at   TIMESTAMPTZ NOT NULL,
+  finished_at   TIMESTAMPTZ,
+  violations    INTEGER NOT NULL DEFAULT 0,
+  verifications INTEGER NOT NULL DEFAULT 0,
+  last_ping_at  TIMESTAMPTZ,
+  draft         JSONB,
+  score         INTEGER,
+  suspeito      BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE TABLE IF NOT EXISTS challenge_events (
+  id         SERIAL PRIMARY KEY,
+  attempt_id INTEGER NOT NULL REFERENCES challenge_attempts(id) ON DELETE CASCADE,
+  type       TEXT NOT NULL,
+  detail     TEXT,
+  weight     INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS challenge_submissions (
+  id         SERIAL PRIMARY KEY,
+  attempt_id INTEGER NOT NULL REFERENCES challenge_attempts(id) ON DELETE CASCADE,
+  flow       JSONB,
+  results    JSONB,
+  passed     BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_attempts_user ON challenge_attempts(user_id, challenge_id);
+CREATE INDEX IF NOT EXISTS idx_events_attempt ON challenge_events(attempt_id);
 
 CREATE INDEX IF NOT EXISTS idx_progress_user ON progress(user_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_user ON quiz_results(user_id);

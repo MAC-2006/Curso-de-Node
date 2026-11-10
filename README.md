@@ -1,4 +1,4 @@
-# Curso de Node — Plataforma com login e banco de dados
+# Curso de Node-RED — Plataforma com login e banco de dados
 
 Plataforma de curso online (login/cadastro reais, banco de dados e
 progresso por aluno). Stack:
@@ -37,10 +37,10 @@ curso-node/
   public/                   frontend (servido como arquivos estáticos)
 ```
 
-O curso hoje tem **11 módulos e 51 aulas**, do "o que é o Node.js" até um
-projeto final guiado — cobrindo JavaScript básico, assincronismo, Express,
-autenticação/segurança, bancos SQL e NoSQL, testes automatizados,
-WebSockets, Docker/CI-CD e deploy.
+O curso hoje tem **7 módulos e 22 aulas**, da introdução ao Node-RED até um
+projeto final de IoT com MQTT. A trilha cobre criação de fluxos, nodes Inject,
+Debug, Change, Switch, Template e Function, manipulação de dados, integração
+com APIs, automação, contexto, dashboard e comunicação MQTT.
 
 ## Conta de administração
 
@@ -79,6 +79,8 @@ passo a passo do que gravar — só visível para a administração, na aba
 roteiro: ele só recebe o título do vídeo, a duração sugerida, e um
 espaço reservado ("Vídeo em produção") até o link do vídeo existir.
 
+> **Vídeos já incluídos:** os 7 pontos de vídeo vêm preenchidos com gravações de tela do simulador, **sem áudio e com legendas** (`public/videos/`, ~2,5 MB no total). Para trocar por uma aula narrada sua, faça o upload pelo painel (tem prioridade) ou edite `videoUrl`.
+
 Você tem duas formas de colocar o vídeo no ar:
 
 1. **Fazer upload pelo painel de administração** — o arquivo vai direto
@@ -96,6 +98,20 @@ Você tem duas formas de colocar o vídeo no ar:
 > opção 2 acima (edite `videoUrl` com um link já hospedado) ou peça que eu
 > implemente upload direto do navegador para o Supabase Storage (contorna
 > esse limite, mas exige expor uma URL assinada e mexer no front-end).
+
+## Simulador de Node-RED e desafios obrigatórios
+
+A plataforma inclui um editor de Node-RED que roda no navegador (canvas, paleta, fios, Deploy, Debug, Dashboard, MQTT simulado) e **16 desafios práticos**. Cada aula com desafio só conta como concluída depois que o desafio for **aprovado**; os desafios de um módulo liberam o módulo seguinte.
+
+- **Laboratório** (menu lateral): editor livre para treinar, sem prova.
+- **Modo prova**: tela cheia obrigatória, colar/copiar/arrastar bloqueados, sair da página/aba/tela cheia gera violação, tempo limite, no máximo 8 verificações por tentativa. 3 violações anulam a tentativa (espera de 120 s). Colagem de código é detectada comparando o texto digitado com as teclas registradas (tentativa marcada como `suspeito`).
+- **Correção no servidor**: o fluxo é reexecutado com o mesmo motor (relógio virtual) e testes ocultos com valores aleatórios a cada verificação. Nodes de função rodam em QuickJS (WASM) isolado, com limite de tempo e memória. Nodes travados (🔒) são restaurados pelo servidor.
+- **Painel admin**: mostra desafios aprovados, violações, tentativas anuladas e suspeitas por aluno.
+- **Limite honesto**: anti-cola em navegador é dissuasão, não é impenetrável (a pessoa pode usar outro dispositivo). A nota vem sempre do servidor, então não dá para "forjar" aprovação; as violações ficam registradas para você revisar.
+- **Novas tabelas** (já em `supabase/schema.sql`): `challenge_attempts`, `challenge_events`, `challenge_submissions`. Rode o schema de novo no Supabase.
+- **Adicionar desafio**: edite `src/data/challenges.js` (enunciado, requisitos, `fluxoInicial`, função `avaliar`) e inclua uma solução de referência em `test/solucoes.js`.
+- **Testes**: `npm test` (soluções aprovam, fluxo vazio reprova, tentativas adversariais falham).
+- **Vercel**: o QuickJS usa a variante `singlefile` (WASM embutido), sem depender de arquivo `.wasm` no disco.
 
 ## Rodando localmente
 

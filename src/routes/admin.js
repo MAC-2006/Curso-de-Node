@@ -6,6 +6,8 @@ const express = require("express");
 const multer = require("multer");
 const db = require("../db");
 const curriculum = require("../data/curriculum");
+const { aulasConcluidas: calcularConcluidas } = require("../sim/progresso-util");
+const { desafios: listaDesafios } = require("../data/challenges");
 const videoStore = require("../data/video-store");
 const storage = require("../storage");
 const { exigirAutenticacao, exigirAdmin } = require("../middleware/auth");
@@ -61,8 +63,14 @@ router.get("/alunos", async (req, res, next) => {
 
     const linhas = await Promise.all(
       alunos.map(async (aluno) => {
-        const { rows: progressoRows } = await db.query(
-          "SELECT COUNT(*) AS total, MAX(completed_at) AS ultima FROM progress WHERE user_id = $1",
+        const concl = await calcularConcluidas(aluno.id);
+        const progressoRows = [{ total: concl.length, ultima: concl.reduce((m, c) => (!m || c.completed_at > m ? c.completed_at : m), null) }];
+        const { rows: desRows } = await db.query(
+          `SELECT COUNT(DISTINCT challenge_id) FILTER (WHERE status = 'aprovado') AS aprovados,
+                  COALESCE(SUM(violations), 0) AS violacoes,
+                  COUNT(*) FILTER (WHERE status = 'anulado') AS anuladas,
+                  COUNT(*) FILTER (WHERE suspeito) AS suspeitas
+             FROM challenge_attempts WHERE user_id = $1`,
           [aluno.id]
         );
         const { rows: quizRows } = await db.query(
@@ -87,6 +95,11 @@ router.get("/alunos", async (req, res, next) => {
           quizTotal,
           quizAcertos,
           quizPercentual: quizTotal ? Math.round((quizAcertos / quizTotal) * 100) : null,
+          desafiosAprovados: Number(desRows[0].aprovados) || 0,
+          totalDesafios: listaDesafios.length,
+          violacoes: Number(desRows[0].violacoes) || 0,
+          tentativasAnuladas: Number(desRows[0].anuladas) || 0,
+          tentativasSuspeitas: Number(desRows[0].suspeitas) || 0,
         };
       })
     );
@@ -126,8 +139,12 @@ router.get("/alunos/:id", async (req, res, next) => {
       return res.status(404).json({ erro: "Aluno não encontrado." });
     }
 
-    const { rows: concluidas } = await db.query(
-      "SELECT lesson_id, completed_at FROM progress WHERE user_id = $1 ORDER BY completed_at DESC",
+    const concluidas = (await calcularConcluidas(aluno.id)).sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
+    const { rows: tentativas } = await db.query(
+      `SELECT a.id, a.challenge_id, a.status, a.started_at, a.finished_at, a.violations, a.verifications, a.score, a.suspeito,
+              COALESCE((SELECT json_agg(json_build_object('tipo', e.type, 'detalhe', e.detail, 'quando', e.created_at) ORDER BY e.created_at)
+                          FROM challenge_events e WHERE e.attempt_id = a.id AND e.weight > 0 OR (e.attempt_id = a.id AND e.type = 'suspeita_colagem')), '[]'::json) AS eventos
+         FROM challenge_attempts a WHERE a.user_id = $1 ORDER BY a.started_at DESC`,
       [aluno.id]
     );
 
@@ -164,6 +181,7 @@ router.get("/alunos/:id", async (req, res, next) => {
       porModulo,
       concluidas,
       quizzes,
+      tentativas,
     });
   } catch (err) {
     next(err);
